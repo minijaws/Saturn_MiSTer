@@ -17,6 +17,8 @@ module HPS2PAD (
 	// used when JOYx_TYPE == PAD_MULTITAP
 	input      [15: 0] MT1_PAD0, MT1_PAD1, MT1_PAD2, MT1_PAD3, MT1_PAD4, MT1_PAD5,
 	input      [15: 0] MT2_PAD0, MT2_PAD1, MT2_PAD2, MT2_PAD3, MT2_PAD4, MT2_PAD5,
+	input      [ 5: 0] MT1_PRESENT,
+	input      [ 5: 0] MT2_PRESENT,
 
    input      [ 7: 0] JOY1_X1,
    input      [ 7: 0] JOY1_Y1,
@@ -131,7 +133,8 @@ module HPS2PAD (
 		.TH(PDR1O[6] | ~DDR1[6]), .TR(PDR1O[5] | ~DDR1[5]),
 		.TL(mt1_tl), .DATA(mt1_data),
 		.PAD0(MT1_PAD0), .PAD1(MT1_PAD1), .PAD2(MT1_PAD2),
-		.PAD3(MT1_PAD3), .PAD4(MT1_PAD4), .PAD5(MT1_PAD5)
+		.PAD3(MT1_PAD3), .PAD4(MT1_PAD4), .PAD5(MT1_PAD5),
+		.PRESENT(MT1_PRESENT)
 	);
 
 	SaturnMultitap multitap2 (
@@ -139,7 +142,8 @@ module HPS2PAD (
 		.TH(PDR2O[6] | ~DDR2[6]), .TR(PDR2O[5] | ~DDR2[5]),
 		.TL(mt2_tl), .DATA(mt2_data),
 		.PAD0(MT2_PAD0), .PAD1(MT2_PAD1), .PAD2(MT2_PAD2),
-		.PAD3(MT2_PAD3), .PAD4(MT2_PAD4), .PAD5(MT2_PAD5)
+		.PAD3(MT2_PAD3), .PAD4(MT2_PAD4), .PAD5(MT2_PAD5),
+		.PRESENT(MT2_PRESENT)
 	);
 
 	// Keyboard

@@ -190,6 +190,8 @@ module emu
 		"P2-;",
 		"D5P2O[45:42],Pad 2,Digital,Virt LGun,Wheel,Mission Stick,3D Pad,Dual Mission,Mouse,Keyboard,Off,6P Multitap;",
 		"P2-;",
+		"D9P2O[86:84],Multitap Pads,Auto,6,5,4,3,2;",
+		"P2-;",
 		"D7P2O[57],LGun P2 XY Ctrl,Joy 2,Mouse;",
 		"D7P2O[58],LGun P2 Buttons,Joy 2,Mouse;",
 		"D7P2O[60:59],LGun P2 Crosshair,Small,Medium,Big,None;",
@@ -327,7 +329,7 @@ module emu
 	);
 	
 `ifndef STV_BUILD
-	assign menumask = {(status[56:55] != 2'b00), ~lg_p2_ena, ~lg_p1_ena, snac, 1'b1, 1'b1, ~status[8], 1'b1, ~bk_ena};
+	assign menumask = {(status[18:15] != 4'd9 && status[45:42] != 4'd9), (status[56:55] != 2'b00), ~lg_p2_ena, ~lg_p1_ena, snac, 1'b1, 1'b1, ~status[8], 1'b1, ~bk_ena};
 `else
 	assign menumask = {(status[56:55] != 2'b00), 1'b1, 1'b1, ~status[75], 1'b1, 1'b1, ~status[8], ~STV_ALTBIOS, 1'b0};
 `endif
@@ -572,6 +574,29 @@ module emu
 	wire [15:0] mt2_slot3 = mt2_full ? joy4 : mt2_shift ? joy5 : PAD_IDLE;
 	wire [15:0] mt2_slot4 = mt2_full ? joy5 : mt2_shift ? joy6 : PAD_IDLE;
 	wire [15:0] mt2_slot5 = mt2_full ? joy6 : PAD_IDLE;
+
+	// Which tap slots report a connected pad. MiSTer can't tell whether a USB
+	// controller is assigned to a player, so in Auto a player counts as plugged
+	// in from their first button press (P1 always). A fixed count is there for
+	// games that only look at connected pads once at boot.
+	reg  [5:0] joy_seen;
+	always @(posedge clk_sys) begin
+		if (rst_sys || !mt_any) joy_seen <= 6'b000001;
+		else joy_seen <= joy_seen | {|joystick_5, |joystick_4, |joystick_3, |joystick_2, |joystick_1, |joystick_0};
+	end
+
+	wire [2:0] mt_pads_opt = status[86:84];	// 0=Auto, 1..5 = 6..2 pads
+	wire [5:0] mt_fixed = (mt_pads_opt == 3'd1) ? 6'b111111 :
+	                      (mt_pads_opt == 3'd2) ? 6'b011111 :
+	                      (mt_pads_opt == 3'd3) ? 6'b001111 :
+	                      (mt_pads_opt == 3'd4) ? 6'b000111 :
+	                      (mt_pads_opt == 3'd5) ? 6'b000011 : 6'b111111;
+	wire       mt_auto = (mt_pads_opt == 3'd0) || (mt_pads_opt > 3'd5);
+
+	wire [5:0] mt1_present = mt_auto ? joy_seen : mt_fixed;
+	wire [5:0] mt2_present = mt2_full  ? (mt_auto ? joy_seen : mt_fixed) :
+	                         mt2_shift ? (mt_auto ? {1'b0, joy_seen[5:1]} : (mt_fixed & 6'b011111)) :
+	                         6'b000000;
 `else
 	wire [13:0] joy1 = ~joystick_0[13:0];
 	wire [13:0] joy2 = ~joystick_1[13:0];
@@ -1079,6 +1104,8 @@ module emu
 		.MT1_PAD3(joy4), .MT1_PAD4(joy5), .MT1_PAD5(joy6),
 		.MT2_PAD0(mt2_slot0), .MT2_PAD1(mt2_slot1), .MT2_PAD2(mt2_slot2),
 		.MT2_PAD3(mt2_slot3), .MT2_PAD4(mt2_slot4), .MT2_PAD5(mt2_slot5),
+		.MT1_PRESENT(mt1_present),
+		.MT2_PRESENT(mt2_present),
 
 		.JOY1_X1(joy0_x0),
 		.JOY1_Y1(joy0_y0),

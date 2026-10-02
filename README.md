@@ -25,4 +25,9 @@ Set **Input → Pad 1** or **Pad 2** to **6P Multitap** to plug an emulated Sega
 | Pad 2 = 6P Multitap + Pad 1 SNAC | real hardware (e.g. a real multitap) | Tap: P1–P6 |
 | Both = 6P Multitap | Tap: P1–P6 | Tap: idle |
 
-Swap Joysticks is ignored while a tap is enabled. All six tap slots always report a connected pad.
+Swap Joysticks is ignored while a tap is enabled.
+
+**Multitap Pads** sets which tap slots report a connected pad (empty slots read as "nothing plugged in", like a real tap):
+
+- **Auto** (default): P1 is always connected; every other player appears the first time they press a button. MiSTer can't tell whether a USB pad is assigned to a player, so a press stands in for plugging it in.
+- **6, 5, 4, 3, 2**: that many slots, starting from slot A, are always connected. Use this for games that only check connected pads at boot.

@@ -11,6 +11,7 @@
 //
 //   Header             : 4, 1, 6, 0            (multitap ID 0x41, 6 ports)
 //   Per port (x6)      : 0, 2, DIR, SACB, RXYZ, L111   (digital pad, ID 0x02)
+//                        F, F                          (nothing connected)
 //   Footer             : 0, 1
 //
 // After the footer the tap holds its outputs until TH goes high again.
@@ -21,9 +22,8 @@
 //   [ 7: 4] TH0/TR0 nibble (R,X,Y,Z)
 //   [    3] L
 //
-// Every port always reports a connected pad: MiSTer cannot tell whether a
-// USB controller is assigned to a given player slot, and an idle pad is
-// harmless to games.
+// PRESENT[n] says whether slot n has a pad plugged in. It is sampled when a
+// port's first nibble goes out, so a change mid-read can't corrupt the stream.
 
 module SaturnMultitap (
 	input             CLK,
@@ -40,7 +40,8 @@ module SaturnMultitap (
 	input      [15:0] PAD2,
 	input      [15:0] PAD3,
 	input      [15:0] PAD4,
-	input      [15:0] PAD5
+	input      [15:0] PAD5,
+	input      [ 5:0] PRESENT
 );
 
 	localparam PH_HEADER = 2'd0;
@@ -51,6 +52,7 @@ module SaturnMultitap (
 	reg [1:0] phase;
 	reg [2:0] cnt;    // nibble within header / port / footer
 	reg [2:0] port;
+	reg       cur_present;	// latched for the port being sent
 
 	reg [15:0] pad;
 	always_comb begin
@@ -76,8 +78,8 @@ module SaturnMultitap (
 				endcase
 			PH_PORTS:
 				case (cnt)
-					3'd0:    nib = 4'h0;
-					3'd1:    nib = 4'h2;
+					3'd0:    nib = PRESENT[port] ? 4'h0 : 4'hF;
+					3'd1:    nib = cur_present   ? 4'h2 : 4'hF;
 					3'd2:    nib = pad[15:12];
 					3'd3:    nib = pad[11: 8];
 					3'd4:    nib = pad[ 7: 4];
@@ -95,6 +97,7 @@ module SaturnMultitap (
 			phase <= PH_HEADER;
 			cnt   <= '0;
 			port  <= '0;
+			cur_present <= 1'b0;
 			TL    <= 1'b1;
 			DATA  <= 4'h1;
 		end else if (CE) begin
@@ -114,7 +117,8 @@ module SaturnMultitap (
 						else cnt <= cnt + 3'd1;
 					end
 					PH_PORTS: begin
-						if (cnt == 3'd5) begin
+						if (cnt == 3'd0) cur_present <= PRESENT[port];
+						if (cnt == 3'd5 || (cnt == 3'd1 && !cur_present)) begin
 							cnt <= '0;
 							if (port == 3'd5) phase <= PH_FOOTER;
 							else              port  <= port + 3'd1;
