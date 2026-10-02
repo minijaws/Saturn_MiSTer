@@ -14,6 +14,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram1.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram2.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ddram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/vdp1_fb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/multitap.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/hps2pad.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ps2mouse.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ps2keyboard.sv

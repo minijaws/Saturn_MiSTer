@@ -13,6 +13,11 @@ module HPS2PAD (
 	input      [15: 0] JOY1,
 	input      [15: 0] JOY2,
 
+	// 6-player multitap slots (same active-low layout as JOYx),
+	// used when JOYx_TYPE == PAD_MULTITAP
+	input      [15: 0] MT1_PAD0, MT1_PAD1, MT1_PAD2, MT1_PAD3, MT1_PAD4, MT1_PAD5,
+	input      [15: 0] MT2_PAD0, MT2_PAD1, MT2_PAD2, MT2_PAD3, MT2_PAD4, MT2_PAD5,
+
    input      [ 7: 0] JOY1_X1,
    input      [ 7: 0] JOY1_Y1,
    input      [ 7: 0] JOY1_X2,
@@ -114,6 +119,28 @@ module HPS2PAD (
 	parameter PAD_MOUSE       = 6;
 	parameter PAD_KEYBOARD    = 7;
 	parameter PAD_OFF         = 8;
+	parameter PAD_MULTITAP    = 9;
+
+	// 6-player multitap. Line levels as the device sees them: pins the SMPC
+	// isn't driving float high (pull-ups), same as the PDRxI default below.
+	wire        mt1_tl, mt2_tl;
+	wire [ 3:0] mt1_data, mt2_data;
+
+	SaturnMultitap multitap1 (
+		.CLK(CLK), .RST_N(RST_N), .CE(SMPC_CE & (JOY1_TYPE == PAD_MULTITAP)),
+		.TH(PDR1O[6] | ~DDR1[6]), .TR(PDR1O[5] | ~DDR1[5]),
+		.TL(mt1_tl), .DATA(mt1_data),
+		.PAD0(MT1_PAD0), .PAD1(MT1_PAD1), .PAD2(MT1_PAD2),
+		.PAD3(MT1_PAD3), .PAD4(MT1_PAD4), .PAD5(MT1_PAD5)
+	);
+
+	SaturnMultitap multitap2 (
+		.CLK(CLK), .RST_N(RST_N), .CE(SMPC_CE & (JOY2_TYPE == PAD_MULTITAP)),
+		.TH(PDR2O[6] | ~DDR2[6]), .TR(PDR2O[5] | ~DDR2[5]),
+		.TL(mt2_tl), .DATA(mt2_data),
+		.PAD0(MT2_PAD0), .PAD1(MT2_PAD1), .PAD2(MT2_PAD2),
+		.PAD3(MT2_PAD3), .PAD4(MT2_PAD4), .PAD5(MT2_PAD5)
+	);
 
 	// Keyboard
 	wire  [ 2:0] kbd_led;
@@ -514,6 +541,10 @@ module HPS2PAD (
 			PAD_KEYBOARD: begin
 				if (kbd_sel_p1) PDR1I[4:0] = kbd_port_i[4:0];
 			end
+
+			PAD_MULTITAP: begin
+				PDR1I[4:0] = {mt1_tl, mt1_data};
+			end
 			
 			//TODO
 			default: ;
@@ -552,6 +583,10 @@ module HPS2PAD (
 
 			PAD_KEYBOARD: begin
 				if (kbd_sel_p2) PDR2I[4:0] = kbd_port_i[4:0];
+			end
+
+			PAD_MULTITAP: begin
+				PDR2I[4:0] = {mt2_tl, mt2_data};
 			end
 			
 			//TODO

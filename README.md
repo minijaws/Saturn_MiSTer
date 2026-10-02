@@ -13,3 +13,16 @@ The core has matured substantially, with many games tested over the course of de
 
 Known issues and limitations are tracked in this repository's issue list rather than in a game-by-game list here.
 
+
+## 6-Player Multitap
+
+Set **Input → Pad 1** or **Pad 2** to **6P Multitap** to plug an emulated Sega 6-Player Multitap into that port. Each tap slot is a digital pad. MiSTer exposes at most six controllers, so they are assigned as follows:
+
+| Setting | Port 1 | Port 2 |
+|---|---|---|
+| Pad 1 = 6P Multitap | Tap: P1–P6 | idle pad |
+| Pad 2 = 6P Multitap | P1 | Tap: P2–P6 (slot F idle) |
+| Pad 2 = 6P Multitap + Pad 1 SNAC | real hardware (e.g. a real multitap) | Tap: P1–P6 |
+| Both = 6P Multitap | Tap: P1–P6 | Tap: idle |
+
+Swap Joysticks is ignored while a tap is enabled. All six tap slots always report a connected pad.

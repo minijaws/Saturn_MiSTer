@@ -181,14 +181,14 @@ module emu
 		"P2O[76],Swap Joysticks,No,Yes;",
 		"P2O[27],Pad 1 SNAC,OFF,ON;",
 		"P2-;",
-		"D5P2O[18:15],Pad 1,Digital,Virt LGun,Wheel,Mission Stick,3D Pad,Dual Mission,Mouse,Keyboard,Off;",
+		"D5P2O[18:15],Pad 1,Digital,Virt LGun,Wheel,Mission Stick,3D Pad,Dual Mission,Mouse,Keyboard,Off,6P Multitap;",
 		"P2-;",
 		"D6P2O[46],LGun P1 XY Ctrl,Joy 1,Mouse;",
 		"D6P2O[47],LGun P1 Buttons,Joy 1,Mouse;",
 		"D6P2O[49:48],LGun P1 Crosshair,Small,Medium,Big,None;",
 		"P2-;",
 		"P2-;",
-		"D5P2O[45:42],Pad 2,Digital,Virt LGun,Wheel,Mission Stick,3D Pad,Dual Mission,Mouse,Keyboard,Off;",
+		"D5P2O[45:42],Pad 2,Digital,Virt LGun,Wheel,Mission Stick,3D Pad,Dual Mission,Mouse,Keyboard,Off,6P Multitap;",
 		"P2-;",
 		"D7P2O[57],LGun P2 XY Ctrl,Joy 2,Mouse;",
 		"D7P2O[58],LGun P2 Buttons,Joy 2,Mouse;",
@@ -219,7 +219,7 @@ module emu
 	wire [127:0] status;
 	wire [ 15:0] menumask;
 	wire [  1:0] buttons;
-	wire [ 13:0] joystick_0,joystick_1,joystick_2,joystick_3,joystick_4;
+	wire [ 13:0] joystick_0,joystick_1,joystick_2,joystick_3,joystick_4,joystick_5;
 	wire [  7:0] joy0_x0,joy0_y0,joy0_x1,joy0_y1,joy1_x0,joy1_y0,joy1_x1,joy1_y1;
 	wire         ioctl_download,ioctl_upload;
 	wire         ioctl_upload_req;
@@ -273,6 +273,7 @@ module emu
 		.joystick_2(joystick_2),
 		.joystick_3(joystick_3),
 		.joystick_4(joystick_4),
+		.joystick_5(joystick_5),
 		.joystick_l_analog_0({joy0_y0, joy0_x0}),
 		.joystick_l_analog_1({joy1_y0, joy1_x0}),
 		.joystick_r_analog_0({joy0_y1, joy0_x1}),
@@ -529,17 +530,53 @@ module emu
 	wire [3:0] area_code = 4'h1;
 `endif
 																	
+	wire snac = status[27];
+
 `ifndef STV_BUILD														
 	wire [15:0] joy1 = {~joystick_0[0]|joystick_0[1], ~joystick_0[1]|joystick_0[0], ~joystick_0[2]|joystick_0[3], ~joystick_0[3]|joystick_0[2], ~joystick_0[7], ~joystick_0[4], ~joystick_0[6], ~joystick_0[5],
 							  ~joystick_0[8], ~joystick_0[9], ~joystick_0[10], ~joystick_0[11], ~joystick_0[12], 3'b111};
 	wire [15:0] joy2 = {~joystick_1[0]|joystick_1[1], ~joystick_1[1]|joystick_1[0], ~joystick_1[2]|joystick_1[3], ~joystick_1[3]|joystick_1[2], ~joystick_1[7], ~joystick_1[4], ~joystick_1[6], ~joystick_1[5],
 							  ~joystick_1[8], ~joystick_1[9], ~joystick_1[10], ~joystick_1[11], ~joystick_1[12], 3'b111};
+
+	// MiSTer joystick -> Saturn digital pad word (active low), same layout as joy1/joy2.
+	function automatic [15:0] sat_pad(input [13:0] j);
+		sat_pad = {~j[0]|j[1], ~j[1]|j[0], ~j[2]|j[3], ~j[3]|j[2], ~j[7], ~j[4], ~j[6], ~j[5],
+		           ~j[8], ~j[9], ~j[10], ~j[11], ~j[12], 3'b111};
+	endfunction
+
+	localparam [15:0] PAD_IDLE = 16'hFFFF;	// connected pad, nothing pressed
+
+	wire [15:0] joy3 = sat_pad(joystick_2);
+	wire [15:0] joy4 = sat_pad(joystick_3);
+	wire [15:0] joy5 = sat_pad(joystick_4);
+	wire [15:0] joy6 = sat_pad(joystick_5);
+
+	// 6-player multitap (Pad type 9). MiSTer exposes at most 6 controllers:
+	//  - Tap on port 1          : slots A-F = P1-P6, port 2 idle
+	//  - Tap on port 2          : port 1 = P1, slots A-E = P2-P6, F idle
+	//  - Tap on port 2 + SNAC   : port 1 = real hardware (e.g. a real tap), slots A-F = P1-P6
+	//  - Taps on both ports     : port 1 tap = P1-P6, port 2 tap idle
+	// Swap Joysticks is ignored while a tap is in use.
+	wire mt1 = (status[18:15] == 4'd9) && !snac;
+	wire mt2 = (status[45:42] == 4'd9);
+	wire mt_any = mt1 | mt2;
+	wire mt2_full = mt2 && !mt1 && snac;
+	wire mt2_shift = mt2 && !mt1 && !snac;
+
+	wire [15:0] pad_joy1 = (!mt_any && status[76]) ? joy2 : joy1;
+	wire [15:0] pad_joy2 = mt1 ? PAD_IDLE : (!mt_any && status[76]) ? joy1 : joy2;
+
+	wire [15:0] mt2_slot0 = mt2_full ? joy1 : mt2_shift ? joy2 : PAD_IDLE;
+	wire [15:0] mt2_slot1 = mt2_full ? joy2 : mt2_shift ? joy3 : PAD_IDLE;
+	wire [15:0] mt2_slot2 = mt2_full ? joy3 : mt2_shift ? joy4 : PAD_IDLE;
+	wire [15:0] mt2_slot3 = mt2_full ? joy4 : mt2_shift ? joy5 : PAD_IDLE;
+	wire [15:0] mt2_slot4 = mt2_full ? joy5 : mt2_shift ? joy6 : PAD_IDLE;
+	wire [15:0] mt2_slot5 = mt2_full ? joy6 : PAD_IDLE;
 `else
 	wire [13:0] joy1 = ~joystick_0[13:0];
 	wire [13:0] joy2 = ~joystick_1[13:0];
 `endif
 
-	wire snac = status[27];
 	reg  [6:0] USERJOYSTICK;
 	wire [6:0] USERJOYSTICKOUT;
 	always @(posedge clk_sys) begin
@@ -1035,8 +1072,13 @@ module emu
 		.PDR2O(SMPC_PDR2O),
 		.DDR2(SMPC_DDR2),
 		
-		.JOY1(status[76] ? joy2 : joy1),
-		.JOY2(status[76] ? joy1 : joy2),
+		.JOY1(pad_joy1),
+		.JOY2(pad_joy2),
+
+		.MT1_PAD0(joy1), .MT1_PAD1(joy2), .MT1_PAD2(joy3),
+		.MT1_PAD3(joy4), .MT1_PAD4(joy5), .MT1_PAD5(joy6),
+		.MT2_PAD0(mt2_slot0), .MT2_PAD1(mt2_slot1), .MT2_PAD2(mt2_slot2),
+		.MT2_PAD3(mt2_slot3), .MT2_PAD4(mt2_slot4), .MT2_PAD5(mt2_slot5),
 
 		.JOY1_X1(joy0_x0),
 		.JOY1_Y1(joy0_y0),
